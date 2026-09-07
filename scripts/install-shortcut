@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Install the single evergreen OmniOutliner shortcut (Dock / Applications / PATH).
+# Re-run after moving the clone; the shortcut always launches current source.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+OPEN="$REPO/scripts/open"
+ICON="$REPO/build/icon.svg"
+CONFIG_DIR="${OMNILOUTLINER_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/OmniOutliner}"
+BIN_DIR="${OMNILOUTLINER_BIN:-$HOME/.local/bin}"
+APP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+MAC_APP_DIR="${OMNILOUTLINER_MAC_APP:-$HOME/Applications}"
+
+if [[ ! -x "$OPEN" ]]; then
+  chmod +x "$OPEN"
+fi
+if [[ ! -f "$REPO/package.json" ]] || ! grep -q '"name": "omniliner"' "$REPO/package.json"; then
+  echo "install-shortcut must run from the omniliner repo." >&2
+  exit 1
+fi
+
+mkdir -p "$CONFIG_DIR" "$BIN_DIR"
+printf '%s\n' "$REPO" >"$CONFIG_DIR/repo"
+ln -sfn "$OPEN" "$BIN_DIR/omnioutliner"
+
+write_desktop() {
+  mkdir -p "$APP_DIR"
+  cat >"$APP_DIR/omnioutliner.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=OmniOutliner
+Comment=Open OmniOutliner from current source
+Exec=$OPEN
+Icon=$ICON
+Terminal=false
+Categories=Office;Utility;
+StartupNotify=true
+MimeType=x-scheme-handler/omnioutliner;x-scheme-handler/omniliner;
+Keywords=outline;omniliner;
+EOF
+  chmod 644 "$APP_DIR/omnioutliner.desktop"
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database "$APP_DIR" >/dev/null 2>&1 || true
+  fi
+  if command -v xdg-desktop-menu >/dev/null 2>&1; then
+    xdg-desktop-menu forceupdate >/dev/null 2>&1 || true
+  fi
+}
+
+write_mac_command() {
+  mkdir -p "$MAC_APP_DIR"
+  local dest="$MAC_APP_DIR/OmniOutliner.command"
+  cat >"$dest" <<EOF
+#!/bin/bash
+exec "$OPEN"
+EOF
+  chmod +x "$dest"
+}
+
+case "$(uname -s)" in
+  Darwin)
+    write_mac_command
+    echo "Shortcut: $MAC_APP_DIR/OmniOutliner.command"
+    ;;
+  *)
+    write_desktop
+    echo "Shortcut: $APP_DIR/omnioutliner.desktop"
+    ;;
+esac
+
+echo "Command:  $BIN_DIR/omnioutliner"
+echo "Source:   $REPO"
+echo "This shortcut always launches the working tree — new code is picked up without rebuilding an installer."
+if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+  echo "Note: add $BIN_DIR to PATH to use the omnioutliner command from a terminal."
+fi
