@@ -14,7 +14,7 @@ npm test
 npx tsx src/cli/index.ts --help
 ```
 
-`npm run shortcut` installs **one** launcher named OmniOutliner. It always starts the current working tree (`tsx` + Vite), so new code is live without rebuilding an installer. Re-run it if you move the clone.
+`npm run shortcut` installs **one** launcher named OmniOutliner. On Mac that is `~/Applications/OmniOutliner.app` (Spotlight). On Linux it is a themed `.desktop` entry (Activities / app grid). It always starts the current working tree (`tsx` + Vite), so new code is live without rebuilding an installer. Re-run it if you move the clone, then search for **OmniOutliner**.
 
 Production-style: `npm run build && PORT=4466 npm start` (serves `web/dist` from the API).
 
