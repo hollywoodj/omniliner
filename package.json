@@ -1,0 +1,126 @@
+{
+  "name": "omniliner",
+  "version": "6.2.1",
+  "description": "OmniOutliner 6 Pro clone — hierarchical outlines, columns, styles, Omni Automation, and Notebook/OmniClone integration",
+  "author": "OmniLiner",
+  "license": "MIT",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "bin": {
+    "omniliner": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "tsx watch src/server/index.ts",
+    "dev:web": "vite --config web/vite.config.ts",
+    "dev:electron": "concurrently -k \"npm run dev:api\" \"wait-on http://127.0.0.1:4466/api/health && electron .\"",
+    "build": "tsc -p tsconfig.json && vite build --config web/vite.config.ts",
+    "build:electron": "npm run build && electron-builder --publish never",
+    "build:electron:linux": "npm run build && electron-builder --linux --publish never",
+    "build:electron:mac": "npm run build && electron-builder --mac --publish never",
+    "build:electron:win": "npm run build && electron-builder --win --publish never",
+    "pack": "npm run build && electron-builder --dir --publish never",
+    "start": "node dist/server/index.js",
+    "electron": "electron .",
+    "cli": "tsx src/cli/index.ts",
+    "test": "tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "commander": "^14.0.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.16.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.2.0",
+    "electron": "^35.7.5",
+    "electron-builder": "^26.0.12",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.6",
+    "wait-on": "^8.0.4"
+  },
+  "build": {
+    "appId": "com.omniliner.outliner",
+    "productName": "OmniOutliner",
+    "copyright": "Copyright © 2026 OmniLiner",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "web/dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "dist/**/*",
+      "web/dist/**/*"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "desktop": {
+        "entry": {
+          "Name": "OmniOutliner"
+        }
+      },
+      "syncDesktopName": true,
+      "maintainer": "OmniLiner <support@example.com>",
+      "synopsis": "OmniOutliner 6 Pro clone with Notebook and OmniClone integration",
+      "description": "Hierarchical outlining with columns, styles, notes, filters, OPML, and URL-scheme bridges to Notebook and OmniClone."
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "OmniOutliner ${version}",
+      "backgroundColor": "#ececec"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "OmniOutliner"
+    },
+    "protocols": [
+      {
+        "name": "OmniOutliner",
+        "schemes": [
+          "omnioutliner",
+          "omniliner"
+        ]
+      }
+    ]
+  }
+}
