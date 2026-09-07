@@ -8,10 +8,13 @@ This is not affiliated with The Omni Group. UI, menus, inspectors, and file form
 
 ```bash
 npm install
-npm run dev          # API :4466  ·  UI :5174 (proxied)
+npm run shortcut     # one evergreen OmniOutliner shortcut (Dock / Apps / PATH)
+omnioutliner         # after shortcut install, or: npm run open
 npm test
 npx tsx src/cli/index.ts --help
 ```
+
+`npm run shortcut` installs **one** launcher named OmniOutliner. It always starts the current working tree (`tsx` + Vite), so new code is live without rebuilding an installer. Re-run it if you move the clone.
 
 Production-style: `npm run build && PORT=4466 npm start` (serves `web/dist` from the API).
 

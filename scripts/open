@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# Evergreen OmniOutliner launcher: always runs the current working tree, never a stale installer.
+set -euo pipefail
+
+API_PORT="${PORT:-4466}"
+UI_PORT="${OMNILOUTLINER_UI_PORT:-5174}"
+CONFIG_DIR="${OMNILOUTLINER_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/OmniOutliner}"
+MARKER="$CONFIG_DIR/repo"
+PID_FILE="$CONFIG_DIR/dev.pid"
+LOG_FILE="$CONFIG_DIR/dev.log"
+
+log() {
+  if [[ -t 1 ]]; then
+    printf '%s\n' "$*"
+  fi
+  mkdir -p "$CONFIG_DIR"
+  printf '%s %s\n' "$(date -Iseconds 2>/dev/null || date)" "$*" >>"$LOG_FILE"
+}
+
+die() {
+  printf '%s\n' "$*" >&2
+  mkdir -p "$CONFIG_DIR"
+  printf '%s ERROR %s\n' "$(date -Iseconds 2>/dev/null || date)" "$*" >>"$LOG_FILE"
+  exit 1
+}
+
+is_repo() {
+  local dir="$1"
+  [[ -f "$dir/package.json" ]] && grep -q '"name": "omniliner"' "$dir/package.json" 2>/dev/null
+}
+
+resolve_repo() {
+  if [[ -n "${OMNILOUTLINER_HOME:-}" ]] && is_repo "$OMNILOUTLINER_HOME"; then
+    (cd "$OMNILOUTLINER_HOME" && pwd)
+    return
+  fi
+  local here
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if is_repo "$here/.."; then
+    (cd "$here/.." && pwd)
+    return
+  fi
+  if [[ -f "$MARKER" ]]; then
+    local pinned
+    pinned="$(tr -d '\n' <"$MARKER")"
+    if is_repo "$pinned"; then
+      printf '%s\n' "$pinned"
+      return
+    fi
+  fi
+  die "Cannot find OmniOutliner source. Clone hollywoodj/omniliner, then run: npm run shortcut"
+}
+
+healthy() {
+  local url="$1"
+  curl -fsS --max-time 1 "$url" >/dev/null 2>&1
+}
+
+wait_healthy() {
+  local url="$1"
+  local label="$2"
+  local n=0
+  while (( n < 90 )); do
+    if healthy "$url"; then
+      return 0
+    fi
+    sleep 0.25
+    n=$((n + 1))
+  done
+  die "Timed out waiting for $label ($url). See $LOG_FILE"
+}
+
+pid_alive() {
+  local pid="$1"
+  [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+ensure_dev() {
+  local repo="$1"
+  mkdir -p "$CONFIG_DIR"
+  if healthy "http://127.0.0.1:${API_PORT}/api/health" && healthy "http://127.0.0.1:${UI_PORT}/"; then
+    log "OmniOutliner already running."
+    return
+  fi
+  if [[ -f "$PID_FILE" ]]; then
+    local old
+    old="$(tr -d '\n' <"$PID_FILE" || true)"
+    if pid_alive "$old"; then
+      wait_healthy "http://127.0.0.1:${API_PORT}/api/health" "API"
+      wait_healthy "http://127.0.0.1:${UI_PORT}/" "UI"
+      return
+    fi
+    rm -f "$PID_FILE"
+  fi
+  log "Starting OmniOutliner from source in $repo"
+  (
+    cd "$repo"
+    if [[ ! -d node_modules ]]; then
+      npm install
+    fi
+    npm run dev
+  ) >>"$LOG_FILE" 2>&1 &
+  echo $! >"$PID_FILE"
+  wait_healthy "http://127.0.0.1:${API_PORT}/api/health" "API"
+  wait_healthy "http://127.0.0.1:${UI_PORT}/" "UI"
+}
+
+open_ui() {
+  local repo="$1"
+  local url="http://127.0.0.1:${UI_PORT}/"
+  export ELECTRON_START_URL="$url"
+  if [[ -x "$repo/node_modules/.bin/electron" ]]; then
+    (cd "$repo" && "$repo/node_modules/.bin/electron" .) >/dev/null 2>&1 &
+    return
+  fi
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" >/dev/null 2>&1 || true
+    return
+  fi
+  if command -v open >/dev/null 2>&1; then
+    open "$url"
+    return
+  fi
+  log "Open $url"
+}
+
+REPO="$(resolve_repo)"
+mkdir -p "$CONFIG_DIR"
+printf '%s\n' "$REPO" >"$MARKER"
+
+if [[ "${1:-}" == "--print-repo" ]]; then
+  printf '%s\n' "$REPO"
+  exit 0
+fi
+if [[ "${1:-}" == "--print-url" ]]; then
+  printf 'http://127.0.0.1:%s/\n' "$UI_PORT"
+  exit 0
+fi
+
+ensure_dev "$REPO"
+open_ui "$REPO"
+log "Opened OmniOutliner."

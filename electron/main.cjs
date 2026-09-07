@@ -9,7 +9,9 @@ const DEFAULT_PORT = 4466;
 let mainWindow = null;
 let serverProcess = null;
 let serverPort = DEFAULT_PORT;
+let startedBackend = false;
 const pendingUrls = [];
+const startUrl = process.env.ELECTRON_START_URL || `http://127.0.0.1:${DEFAULT_PORT}/`;
 
 function appRoot() {
   return app.isPackaged ? process.resourcesPath : path.join(__dirname, "..");
@@ -43,7 +45,35 @@ function waitForHealth(port, attempts = 60) {
   });
 }
 
+function healthOk(port) {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${port}/api/health`, (res) => {
+      res.resume();
+      resolve(res.statusCode === 200);
+    });
+    req.on("error", () => resolve(false));
+    req.setTimeout(800, () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
 function startBackend() {
+  return new Promise((resolve, reject) => {
+    healthOk(serverPort).then((ok) => {
+      if (ok) {
+        startedBackend = false;
+        resolve();
+        return;
+      }
+      startedBackend = true;
+      startBackendProcess().then(resolve).catch(reject);
+    });
+  });
+}
+
+function startBackendProcess() {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(userDataDir(), { recursive: true });
     const root = appRoot();
@@ -153,7 +183,7 @@ async function createWindow() {
     if (isAllowedExternalUrl(url)) shell.openExternal(url);
   });
 
-  await mainWindow.loadURL(`http://127.0.0.1:${serverPort}/`);
+  await mainWindow.loadURL(startUrl);
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -211,8 +241,10 @@ if (!gotLock) {
   });
 
   app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0 && serverProcess) await createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
   });
 
-  app.on("before-quit", () => stopBackend());
+  app.on("before-quit", () => {
+    if (startedBackend) stopBackend();
+  });
 }

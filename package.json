@@ -23,7 +23,9 @@
     "start": "node dist/server/index.js",
     "electron": "electron .",
     "cli": "tsx src/cli/index.ts",
-    "test": "tsx --test test/**/*.test.ts"
+    "test": "tsx --test test/**/*.test.ts",
+    "open": "bash scripts/open",
+    "shortcut": "bash scripts/install-shortcut"
   },
   "dependencies": {
     "commander": "^14.0.0",
